@@ -713,46 +713,59 @@ function mapTalks(
     return [];
   }
 
-  const talks = allocations
-    .map((allocation) => {
-      const dayId = cleanString(allocation?.dayId);
-      const slotId = cleanString(allocation?.slotId);
-      const roomId = cleanString(allocation?.roomId);
-      const sessionId = cleanString(allocation?.sessionId);
-      if (!dayId || !slotId || !roomId || !sessionId) {
-        return null;
-      }
+  const validRoomIds = new Set(
+    (Array.isArray(conference?.rooms) ? conference.rooms : [])
+      .map((room: any) => cleanString(room?.id))
+      .filter((roomId: string | undefined): roomId is string => !!roomId)
+  );
 
-      const slot = timelineSlots.get(toTimelineKey(dayId, slotId, roomId));
-      const session = sessionById.get(sessionId);
-      if (!slot || !session) {
-        return null;
-      }
+  const talks = allocations.flatMap((allocation) => {
+    const dayId = cleanString(allocation?.dayId);
+    const slotId = cleanString(allocation?.slotId);
+    const roomId = cleanString(allocation?.roomId);
+    const sessionId = cleanString(allocation?.sessionId);
+    if (!dayId || !slotId || !roomId || !sessionId) {
+      return [];
+    }
 
-      return {
-        speakers: mapTalkSpeakers(session, personById),
-        id: sessionId,
-        title: cleanString(session?.title) ?? '',
-        isOverflow: slot.overflowRoomIds.includes(roomId),
-        start: buildZonedDateTime(slot.localDate, slot.startTime, timezone),
-        end: buildZonedDateTime(slot.localDate, slot.endTime, timezone),
-        summary: cleanString(session?.abstract) ?? '',
-        tags: [buildSessionLevelTag(session)],
-        assets: [],
-        trackId: cleanString(session?.conference?.trackId) ?? '',
-        roomId,
-        formatId: cleanString(session?.conference?.sessionTypeId) ?? cleanString(slot.sessionTypeId) ?? '',
-        langId: normalizeTalkLanguageId(session, conference),
-      };
-    })
-    .filter((talk): talk is any => !!talk)
-    .sort((a, b) => {
-      const byStart = a.start.localeCompare(b.start);
-      if (byStart !== 0) {
-        return byStart;
-      }
-      return a.id.localeCompare(b.id);
-    });
+    const slot = timelineSlots.get(toTimelineKey(dayId, slotId, roomId));
+    const session = sessionById.get(sessionId);
+    if (!slot || !session) {
+      return [];
+    }
+
+    const sourceTalk = {
+      speakers: mapTalkSpeakers(session, personById),
+      id: sessionId,
+      title: cleanString(session?.title) ?? '',
+      isOverflow: false,
+      start: buildZonedDateTime(slot.localDate, slot.startTime, timezone),
+      end: buildZonedDateTime(slot.localDate, slot.endTime, timezone),
+      summary: cleanString(session?.abstract) ?? '',
+      tags: [buildSessionLevelTag(session)],
+      assets: [],
+      trackId: cleanString(session?.conference?.trackId) ?? '',
+      roomId,
+      formatId: cleanString(session?.conference?.sessionTypeId) ?? cleanString(slot.sessionTypeId) ?? '',
+      langId: normalizeTalkLanguageId(session, conference),
+    };
+    const overflowTalks = slot.overflowRoomIds
+      .filter((overflowRoomId) => validRoomIds.has(overflowRoomId))
+      .map((overflowRoomId) => ({
+        ...sourceTalk,
+        roomId: overflowRoomId,
+        isOverflow: true,
+      }));
+
+    return [sourceTalk, ...overflowTalks];
+  })
+  .sort((a, b) => {
+    const byStart = a.start.localeCompare(b.start);
+    if (byStart !== 0) {
+      return byStart;
+    }
+    return a.id.localeCompare(b.id);
+  });
 
   return talks;
 }
