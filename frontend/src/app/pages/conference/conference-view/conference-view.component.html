@@ -124,8 +124,17 @@
       </div>
     }
 
+    @if(currentPerson() && !canManageConference() && !isConferenceSponsor() && speakerFeedbackSessions().length === 0) {
+      <div>Currently, you don't have any role (Speaker, Sponsor or manager) in the conference {{conf.name}}.
+        <br>If you are speaker or sponsor, be sure to use your registration email.
+      </div>
+    }
     @if (currentPerson() && (visibleActivities().length > 0 || canManageConference() || speakerFeedbackSessions().length > 0 || isConferenceSponsor())) {
-      <div class="action-list-name">{{ 'CONFERENCE.VIEW.MY_ACTIVITIES' | translate }}:</div>
+      <div class="action-list-name">{{ 'CONFERENCE.VIEW.MY_ACTIVITIES' | translate }}: 
+        @if(canManageConference()) {<span>&nbsp;Conference Manager</span>}
+        @if(isConferenceSponsor()) {<span>&nbsp;Sponsor</span>}
+        @if(speakerFeedbackSessions().length > 0) {<span>&nbsp;Speaker</span>}
+      </div>
       @if (nonRespondedActivityCount() > 0) {
         <div class="non-responded-count">
           {{ 'CONFERENCE.VIEW.NON_RESPONDED_COUNT' | translate: { count: nonRespondedActivityCount() } }}
